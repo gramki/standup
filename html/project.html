@@ -1,0 +1,192 @@
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="/standup/standup.css">
+	<link href='http://fonts.googleapis.com/css?family=Delius' rel='stylesheet' type='text/css'>
+</head>
+
+<body>
+
+<img class='logo' src="/standup/gimply.png">
+
+<div style='text-align: right; padding-right: 10em; margin-bottom: 0.7em;'>
+View project progress by
+<select id="view" name="viewSelection">
+	<option value='bystatus'>By Status</option >
+	<option value = 'byuser' > By User </option>
+	<option value='byfeature'>By Feature</option >
+</select>
+&nbsp;&nbsp;
+<a href="/standup-api/user-redirect">Post an Update</a>
+</div >
+
+<div id = "report" >
+</div>
+	</body >
+<script src= "/standup/jquery.js">
+</script>
+	<script src="/standup/standup.js">
+	</script>
+	<script>
+		$('#view').change(function(){
+			var view = $('#view').val();
+			changeView(view);
+		});
+		function findCurrentProject(){
+			var url = window.location.href;
+			var parts = url.split("/");
+			var project = parts[parts.length-1].split(" ? ")[0];
+			project = project.split("#")[0];
+			return project;
+		}
+		function getCurrentView(){
+			var url = window.location.href;
+			var parts = url.split("#");
+			var view;
+			var views = {bystatus: true, byuser: true, byfeature:true};
+			if(parts.length>1){
+				view = parts[1];
+			}
+			if(!view || !views[view]){
+				view = 'bystatus';
+			}
+			$('#view').val(view);
+			return view;			
+		}
+		function start(){
+			var pid = findCurrentProject();
+			standup.init(function(){
+				standup.changeCurrentProject(pid);				
+				standup.fetchProjectUpdates(pid, onProjectUpdates);
+			});
+		}
+		function onProjectUpdates(updates){
+			console.log(updates);
+			standup._projectUpdates = updates;
+			changeView(getCurrentView());
+		}
+		function changeView(view){
+			var report;
+			switch(view){
+				case 'byuser':
+				report = byUser(standup._projectUpdates);
+				break;
+				case 'byfeature':
+				report = byFeature(standup._projectUpdates);
+				break;
+				case 'bystatus':
+				default:
+				report = byStatus(standup._projectUpdates);
+				break;
+			}
+			if(report){
+				var html = toHTML(report);
+				$("#report").html(html);				
+			}
+		}
+		function uniqueSecondLevelKeys(map){
+			var firstlevelKeys = obj2array(map);
+			var smap={};
+			firstlevelKeys.forEach(function(k){
+				var arr = obj2array(map[k]);
+				arr.forEach(function(k2){
+					smap[k2] = true;
+				});
+			});
+			return obj2array(smap);
+		}
+		function someUpdateOnDay(map, day){
+			for(var k in map[day]){
+				var arr = map[day][k];
+				if(arr.length>0){
+					return arr[0];
+				}
+			}
+			return null;
+		}
+		function toHTML(map){
+			delete map.unknown;
+			var days = obj2array(map);
+			days.sort(function(l, r){
+				if(l>r){
+					return -1;
+				}
+				return 1;
+			});
+			var columns = uniqueSecondLevelKeys(map);
+			columns.sort();
+			
+			var html = "<table>";
+			html += " <tr> ";
+			html += " <td class='chead day' style='background-color: white;'>&nbsp;</td>";
+			columns.forEach(function(c){
+				html += "<td class='chead'><span class='clabel'>"+ c +"</span></td>";
+			});
+			html += "</tr>";
+			days.forEach(function(day){
+				html += "<tr>";
+				html += "<td class='day' style='background-color: white;'>" + getDayName2(someUpdateOnDay(map, day)) + "</td > ";
+				columns.forEach(function(col){
+					html += "<td class='update'>";
+					if(map[day][col]){
+						var updates = map[day][col];
+						updates.forEach(function(update){
+							html += '<p>' + update.html + '</p>';
+						});
+					}
+					html += "</td>";
+				});	
+				html += "</tr>";				
+			});
+			html += "</table>"
+			return html;
+		}
+		function byStatus(updates){
+			var report={};
+			updates.forEach(function(update){
+				update.statuses.forEach(function(status){
+					var day=getDay(update);					
+					if(!report[day]){
+						report[day]=[];
+					}
+					if(!report[day][status]){
+						report[day][status]=[]
+					}
+					report[day][status].push(update);
+				});
+			});
+			return report;
+		}
+		function byFeature(updates){
+			var report={};
+			updates.forEach(function(update){
+				update.features.forEach(function(feature){
+					var day=getDay(update);					
+					if(!report[day]){
+						report[day]=[];
+					}
+					if(!report[day][feature]){
+						report[day][feature]=[]
+					}
+					report[day][feature].push(update);
+				});
+			});
+			return report;
+		}
+		function byUser(updates){
+			var report={};
+			updates.forEach(function(update){
+					var day=getDay(update);	
+					var user = update.user;				
+					if(!report[day]){
+						report[day]=[];
+					}
+					if(!report[day][user]){
+						report[day][user]=[]
+					}
+					report[day][user].push(update);
+			});
+			return report;
+		}
+		start();
+	</script>
+</html>

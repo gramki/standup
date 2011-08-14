@@ -1,0 +1,84 @@
+<html>
+<head>
+	<link rel="stylesheet" type="text/css" href="/standup/standup.css">
+	<link href='http://fonts.googleapis.com/css?family=Delius' rel='stylesheet' type='text/css'>
+</head>
+<body>
+
+<img class='logo' src="/standup/gimply.png">
+<div id="content">
+<div id='postStatus'></div>
+<div id='updateDiv'>
+	<table width='85%'>
+		<tr>
+			<td width='85%'>
+				<span class='hint'>Post progress you made in <select id="projectList" name="projectList">
+				</select> project or <a href='javascript:void(0);' onclick='goToProjectPage()'>view status</a>
+			</span><br/>
+			<textarea id='status' name='status' style='width: 100%'></textarea>
+			<td valign="bottom">
+				<button type="button" id="go" style='width: 5em; height: 2em; background-color: #cf1166; border: 1px solid #cf1166; color: #fff; font-weight: bold; border-radius: 7px; height: 3em;'>Go!</button>
+			</td>
+		</tr>
+		<tr>
+			<td>
+				<div id='preview' style='width: 98%; display: none;'>
+				</div>
+				
+			</td>
+		</tr>
+	</table>
+</div>
+<div>
+</div>
+<div id='prev'>
+</div>
+</div>	
+</body>
+<script src="/standup/jquery.js">
+</script>
+<script src="/standup/standup.js">
+</script>
+<script>
+	function goToProjectPage(){
+		var projectId = standup.getCurrentProject();
+		var url = "/standup/p/" + projectId;
+		window.location.href=url;
+	}
+	$(document).ready(function() {
+	    $('#status').keypress(standup.handleStatusChange);
+	    $('#status').change(standup.handleStatusChange);
+		$('#projectList').change(standup.handleProjectChange);
+		standup.init();
+	});
+
+$('#go').click(function() {
+    var txt = $('#status')[0].value;
+	var update = standup.toUpdateObject(txt);
+	update.project = standup.getCurrentProject();
+	delete update.html;
+	
+    $.ajax({
+        url: '/standup-api/',
+        type: 'POST',
+		processData: false,
+		data: JSON.stringify({request: 'update-post', data: update }),
+		success: function(){
+			$('#postStatus').html('Yo! Your progress is published.');
+			standup.fetchUpdatesForUser();
+			$('#status').val('');
+			$('#preview').html('');
+			$("#preview")[0].style.display = 'none';
+		},
+		error: function(e){
+			var html;
+			console.error("While Posting update", e);
+			if(e.status === 403){
+				html = "You need to <a href='/standup/login.html'>re-login</a>!";
+			}
+			$('#postStatus').html('Brr!! ' + html);
+		}
+    });
+});
+</script>
+</html>
